@@ -555,6 +555,15 @@ function updateSearchPreferences() {
 
 
 
+// Mobile menu toggle
+function toggleMobileMenu() {
+    const sidebar = document.getElementById('mobileSidebar');
+    const overlay = document.getElementById('sidebarOverlay');
+    
+    sidebar.classList.toggle('open');
+    overlay.classList.toggle('open');
+}
+
 // Initialize on page load
 window.addEventListener('load', function () {
     // Animate stats

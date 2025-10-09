@@ -138,7 +138,29 @@ body {
 
 .close-btn:hover {
     background: var(--bg-secondary);
-    color: var(--text);
+}
+
+.sidebar-menu {
+    display: flex;
+    flex-direction: column;
+    padding: 20px;
+    gap: 12px;
+}
+
+.sidebar-menu a {
+    padding: 12px 16px;
+    color: #1f2937 !important;
+    text-decoration: none !important;
+    border-radius: 8px;
+    transition: all 0.2s ease;
+    font-weight: 500;
+    display: block;
+    background: var(--bg-secondary);
+}
+
+.sidebar-menu a:hover {
+    background: #6366F1;
+    color: white !important;
 }
 
 .sidebar-content {

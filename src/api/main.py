@@ -5,11 +5,11 @@ import os
 import sys
 sys.path.append('/Users/prathamgupta/Downloads/yuvanova-production')
 from src.scraper.real_job_scraper import RealJobScraper
-from src.matcher.ml_job_matcher import MLJobMatcher
+# from src.matcher.ml_job_matcher import MLJobMatcher
 
 app = FastAPI(title="YuvaNova Job Matching API")
 scraper = RealJobScraper()
-ml_matcher = MLJobMatcher()
+# ml_matcher = MLJobMatcher()
 
 app.add_middleware(
     CORSMiddleware,
@@ -36,15 +36,16 @@ async def match_jobs(skills: str = ""):
         # Scrape jobs from multiple sources
         raw_jobs = scraper.get_all_jobs(skills)
         
-        # Use ML algorithms to rank and categorize jobs
-        direct_matches, recommendations = ml_matcher.rank_jobs(skills, raw_jobs)
+        # Simple ranking without ML for Vercel deployment
+        direct_matches = raw_jobs[:15] if len(raw_jobs) > 15 else raw_jobs
+        recommendations = raw_jobs[15:30] if len(raw_jobs) > 15 else []
         
         return {
             "matched_jobs": direct_matches,
             "recommended_jobs": recommendations,
             "total_jobs_analyzed": len(raw_jobs),
             "skills": [s.strip() for s in skills.split(",") if s.strip()],
-            "ml_algorithm": "TF-IDF + Cosine Similarity + K-Means Clustering"
+            "ml_algorithm": "Simple Ranking (ML disabled for deployment)"
         }
     except Exception as e:
         print(f"Error in job matching: {e}")

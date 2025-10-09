@@ -1,5 +1,5 @@
 // API endpoint for fetching real jobs
-const API_BASE_URL = 'http://localhost:8080/api';
+const API_BASE_URL = '/api';
 
 // Local stats tracking (no backend needed)
 const stats = {

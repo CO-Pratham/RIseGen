@@ -3,16 +3,12 @@
     {
       "src": "app.py",
       "use": "@vercel/python"
-    },
-    {
-      "src": "web/**",
-      "use": "@vercel/static"
     }
   ],
   "routes": [
     {
-      "src": "/api/(.*)",
-      "dest": "app.py"
+      "src": "/(.*\\.(css|js|html|png|jpg|jpeg|svg|gif|ico))",
+      "dest": "/web/$1"
     },
     {
       "src": "/",
@@ -20,7 +16,7 @@
     },
     {
       "src": "/(.*)",
-      "dest": "/web/$1"
+      "dest": "/app.py"
     }
   ]
 }

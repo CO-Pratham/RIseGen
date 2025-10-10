@@ -1,5 +1,7 @@
 // API endpoint for fetching real jobs
-const API_BASE_URL = '/api';
+const API_BASE_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
+    ? 'http://localhost:8080/api' 
+    : '/api';
 
 // Local stats tracking (no backend needed)
 const stats = {
@@ -450,6 +452,8 @@ function animateLoadingSteps() {
 // Add sample skills
 function addSampleSkills(skillSet) {
     const skillsInput = document.getElementById('skills');
+    if (!skillsInput) return;
+    
     const samples = {
         'ml': 'Python, Machine Learning, TensorFlow, PyTorch, scikit-learn, pandas, NumPy',
         'software': 'JavaScript, Python, Java, SQL, Git, REST API, Agile',
@@ -514,6 +518,9 @@ function clearSkills() {
 function updateSkillTags() {
     const skillsInput = document.getElementById('skills');
     const skillTags = document.getElementById('skillTags');
+    
+    if (!skillTags || !skillsInput) return; // Exit if elements don't exist
+    
     const skills = skillsInput.value.split(',').map(s => s.trim()).filter(s => s.length > 0);
 
     skillTags.innerHTML = skills.map(skill => `
@@ -527,9 +534,15 @@ function updateSkillTags() {
 // Remove individual skill
 function removeSkill(skillToRemove) {
     const skillsInput = document.getElementById('skills');
+    if (!skillsInput) return;
+    
     const skills = skillsInput.value.split(',').map(s => s.trim()).filter(s => s !== skillToRemove);
     skillsInput.value = skills.join(', ');
-    updateSkillTags();
+    
+    const skillTags = document.getElementById('skillTags');
+    if (skillTags) {
+        updateSkillTags();
+    }
 }
 
 // Update search preferences
@@ -652,8 +665,11 @@ window.addEventListener('load', function () {
     // Animate stats
     setTimeout(animateStats, 1000);
 
-    // Add event listeners
-    document.getElementById('skills').addEventListener('input', updateSkillTags);
+    // Skills input is ready
+    const skillsInput = document.getElementById('skills');
+    if (skillsInput) {
+        console.log('Skills input ready');
+    }
 });
 
 // Clear loading interval when hiding

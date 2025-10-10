@@ -19,8 +19,7 @@ def run_api_server():
 def run_web_server():
     """Run the web interface server"""
     print("🌐 Starting YuvaNova Web Interface...")
-    os.chdir('web')
-    subprocess.run(["python3", "-m", "http.server", "8001"])
+    subprocess.run(["python3", "web/serve.py"])
 
 def open_browser():
     """Open browser after servers start"""

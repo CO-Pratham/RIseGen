@@ -591,54 +591,34 @@ function generateFallbackJobs(userSkills) {
     const recommended = [];
     
     jobTemplates.forEach(template => {
+        const jobSkills = generateSkillsForJob(template.title, skillsArray);
+        const matchScore = calculateMatchScore(userSkills, jobSkills);
+        const recommendationScore = calculateRecommendationScore(userSkills, { ...template, skills: jobSkills });
+        
         const job = {
             ...template,
-            skills: generateSkillsForJob(template.title, skillsArray),
+            skills: jobSkills,
             url: `https://www.naukri.com/job-listings-${template.title.toLowerCase().replace(/\s+/g, '-')}-${template.company.toLowerCase().replace(/\s+/g, '-')}-${Math.random().toString(36).substr(2, 9)}`,
-            matchScore: Math.random() * 0.4 + 0.6, // 60-100%
-            recommendationScore: Math.random() * 0.3 + 0.4 // 40-70%
+            matchScore,
+            recommendationScore
         };
         
-        if (matched.length < 4) {
+        // Only include jobs with meaningful match scores
+        if (matchScore > 0.3) {
             matched.push(job);
-        } else {
+        } else if (recommendationScore > 0.2) {
             recommended.push(job);
         }
     });
     
-        return { matched, recommended, total: jobTemplates.length };
+    // Sort by match scores
+    matched.sort((a, b) => b.matchScore - a.matchScore);
+    recommended.sort((a, b) => b.recommendationScore - a.recommendationScore);
+    
+        return { matched: matched.slice(0, 4), recommended: recommended.slice(0, 4), total: jobTemplates.length };
     } catch (error) {
         console.error('Error in generateFallbackJobs:', error);
-        // Return minimal fallback data
-        return {
-            matched: [
-                {
-                    title: 'Software Developer',
-                    company: 'Tech Corp',
-                    location: 'Bangalore, India',
-                    salary: '₹8-12 LPA',
-                    experience: '2-4 years',
-                    source: 'naukri',
-                    skills: ['JavaScript', 'Python', 'React'],
-                    url: 'https://www.naukri.com/software-developer-jobs',
-                    matchScore: 0.85
-                }
-            ],
-            recommended: [
-                {
-                    title: 'Full Stack Developer',
-                    company: 'Digital Solutions',
-                    location: 'Mumbai, India',
-                    salary: '₹10-15 LPA',
-                    experience: '3-5 years',
-                    source: 'naukri',
-                    skills: ['React', 'Node.js', 'MongoDB'],
-                    url: 'https://www.naukri.com/full-stack-developer-jobs',
-                    recommendationScore: 0.75
-                }
-            ],
-            total: 2
-        };
+        return { matched: [], recommended: [], total: 0 };
     }
 }
 
@@ -654,12 +634,20 @@ function generateSkillsForJob(jobTitle, userSkills) {
         'Data Scientist': ['Python', 'Machine Learning', 'TensorFlow', 'pandas', 'scikit-learn']
     };
     
-    let jobSkills = skillMap[jobTitle] || ['JavaScript', 'Python', 'SQL'];
+    let jobSkills = [...(skillMap[jobTitle] || ['JavaScript', 'Python', 'SQL'])];
     
-    // Add some user skills to increase match relevance
-    userSkills.slice(0, 2).forEach(skill => {
-        if (!jobSkills.includes(skill)) {
-            jobSkills.push(skill);
+    // Match user skills with job requirements
+    const matchingSkills = userSkills.filter(userSkill => 
+        jobSkills.some(jobSkill => 
+            jobSkill.toLowerCase().includes(userSkill) || 
+            userSkill.includes(jobSkill.toLowerCase())
+        )
+    );
+    
+    // Replace some job skills with matching user skills for better relevance
+    matchingSkills.forEach((skill, index) => {
+        if (index < jobSkills.length) {
+            jobSkills[index] = skill.charAt(0).toUpperCase() + skill.slice(1);
         }
     });
     

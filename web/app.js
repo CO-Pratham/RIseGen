@@ -451,15 +451,12 @@ function animateLoadingSteps() {
 function addSampleSkills(skillSet) {
     const skillsInput = document.getElementById('skills');
     const samples = {
-        'python': 'Python, Django, Machine Learning, pandas, TensorFlow, scikit-learn',
-        'javascript': 'JavaScript, React, Node.js, HTML, CSS, MongoDB, TypeScript',
-        'devops': 'AWS, Docker, Kubernetes, Jenkins, Linux, Python, Terraform',
-        'java': 'Java, Spring Boot, Microservices, MySQL, REST API, Hibernate',
-        'data': 'Python, Machine Learning, TensorFlow, pandas, scikit-learn, Deep Learning',
-        'cloud': 'AWS, Azure, Docker, Kubernetes, Terraform, DevOps, Microservices'
+        'ml': 'Python, Machine Learning, TensorFlow, PyTorch, scikit-learn, pandas, NumPy',
+        'software': 'JavaScript, Python, Java, SQL, Git, REST API, Agile',
+        'react': 'React, JavaScript, HTML, CSS, Redux, Node.js, TypeScript',
+        'java': 'Java, Spring Boot, Hibernate, MySQL, Maven, JUnit, Microservices'
     };
     skillsInput.value = samples[skillSet] || '';
-    updateSkillTags();
 }
 
 // Keyboard shortcuts

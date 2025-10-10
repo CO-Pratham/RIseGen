@@ -147,43 +147,49 @@ function searchJobs() {
 
     // Use fallback data directly (no backend needed)
     setTimeout(() => {
-        console.log('Generating job matches for:', userSkills);
-        const fallbackJobs = generateFallbackJobs(userSkills);
-        
-        let skillsMatchingJobs = fallbackJobs.matched;
-        let recommendedJobs = fallbackJobs.recommended;
+        try {
+            console.log('Generating job matches for:', userSkills);
+            const fallbackJobs = generateFallbackJobs(userSkills);
+            
+            let skillsMatchingJobs = fallbackJobs.matched || [];
+            let recommendedJobs = fallbackJobs.recommended || [];
 
-        // Apply client-side filters
-        if (remoteOnly) {
-            skillsMatchingJobs = skillsMatchingJobs.filter(job =>
-                job.location.toLowerCase().includes('remote')
-            );
-            recommendedJobs = recommendedJobs.filter(job =>
-                job.location.toLowerCase().includes('remote')
-            );
+            // Apply client-side filters
+            if (remoteOnly) {
+                skillsMatchingJobs = skillsMatchingJobs.filter(job =>
+                    job.location && job.location.toLowerCase().includes('remote')
+                );
+                recommendedJobs = recommendedJobs.filter(job =>
+                    job.location && job.location.toLowerCase().includes('remote')
+                );
+            }
+
+            if (freshersWelcome) {
+                skillsMatchingJobs = skillsMatchingJobs.filter(job =>
+                    job.experience && (job.experience.includes('0-') || job.experience.includes('1-'))
+                );
+                recommendedJobs = recommendedJobs.filter(job =>
+                    job.experience && (job.experience.includes('0-') || job.experience.includes('1-'))
+                );
+            }
+
+            if (experienceLevel) {
+                const expFilter = experienceLevel.split('-')[0];
+                skillsMatchingJobs = skillsMatchingJobs.filter(job =>
+                    job.experience && job.experience.toLowerCase().includes(expFilter)
+                );
+                recommendedJobs = recommendedJobs.filter(job =>
+                    job.experience && job.experience.toLowerCase().includes(expFilter)
+                );
+            }
+
+            console.log(`Generated ${skillsMatchingJobs.length + recommendedJobs.length} job matches`);
+            displayResults(skillsMatchingJobs, recommendedJobs, userSkills, fallbackJobs.total);
+        } catch (error) {
+            console.error('Error generating jobs:', error);
+            hideFullPageLoading();
+            showError();
         }
-
-        if (freshersWelcome) {
-            skillsMatchingJobs = skillsMatchingJobs.filter(job =>
-                job.experience.includes('0-') || job.experience.includes('1-')
-            );
-            recommendedJobs = recommendedJobs.filter(job =>
-                job.experience.includes('0-') || job.experience.includes('1-')
-            );
-        }
-
-        if (experienceLevel) {
-            const expFilter = experienceLevel.split('-')[0];
-            skillsMatchingJobs = skillsMatchingJobs.filter(job =>
-                job.experience.toLowerCase().includes(expFilter)
-            );
-            recommendedJobs = recommendedJobs.filter(job =>
-                job.experience.toLowerCase().includes(expFilter)
-            );
-        }
-
-        console.log(`Generated ${skillsMatchingJobs.length + recommendedJobs.length} job matches`);
-        displayResults(skillsMatchingJobs, recommendedJobs, userSkills, fallbackJobs.total);
     }, 4000); // Show loading overlay for 4 seconds
 }
 
@@ -542,7 +548,8 @@ function updateSearchPreferences() {
 
 // Generate fallback jobs when API fails
 function generateFallbackJobs(userSkills) {
-    const skillsArray = userSkills.toLowerCase().split(/[,\s]+/).filter(s => s.length > 2);
+    try {
+        const skillsArray = userSkills.toLowerCase().split(/[,\s]+/).filter(s => s.length > 2);
     
     const jobTemplates = [
         { title: 'Software Developer', company: 'Tech Solutions Inc', location: 'Bangalore, India', salary: '₹8-12 LPA', experience: '2-4 years', source: 'naukri' },
@@ -574,7 +581,40 @@ function generateFallbackJobs(userSkills) {
         }
     });
     
-    return { matched, recommended, total: jobTemplates.length };
+        return { matched, recommended, total: jobTemplates.length };
+    } catch (error) {
+        console.error('Error in generateFallbackJobs:', error);
+        // Return minimal fallback data
+        return {
+            matched: [
+                {
+                    title: 'Software Developer',
+                    company: 'Tech Corp',
+                    location: 'Bangalore, India',
+                    salary: '₹8-12 LPA',
+                    experience: '2-4 years',
+                    source: 'naukri',
+                    skills: ['JavaScript', 'Python', 'React'],
+                    url: 'https://www.naukri.com/software-developer-jobs',
+                    matchScore: 0.85
+                }
+            ],
+            recommended: [
+                {
+                    title: 'Full Stack Developer',
+                    company: 'Digital Solutions',
+                    location: 'Mumbai, India',
+                    salary: '₹10-15 LPA',
+                    experience: '3-5 years',
+                    source: 'naukri',
+                    skills: ['React', 'Node.js', 'MongoDB'],
+                    url: 'https://www.naukri.com/full-stack-developer-jobs',
+                    recommendationScore: 0.75
+                }
+            ],
+            total: 2
+        };
+    }
 }
 
 function generateSkillsForJob(jobTitle, userSkills) {

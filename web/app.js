@@ -145,61 +145,45 @@ function searchJobs() {
     // Store experience preference for URL generation
     window.selectedExperience = experienceLevel || (freshersWelcome ? '0-1' : '');
 
-    // Simulate API call with loading delay
+    // Use fallback data directly (no backend needed)
     setTimeout(() => {
-        fetch(`${API_BASE_URL}/match?skills=${encodeURIComponent(userSkills)}`)
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error('Failed to fetch jobs');
-                }
-                return response.json();
-            })
-            .then(data => {
-                if (data.error) {
-                    throw new Error(data.error);
-                }
+        console.log('Generating job matches for:', userSkills);
+        const fallbackJobs = generateFallbackJobs(userSkills);
+        
+        let skillsMatchingJobs = fallbackJobs.matched;
+        let recommendedJobs = fallbackJobs.recommended;
 
-                let skillsMatchingJobs = data.matched_jobs || [];
-                let recommendedJobs = data.recommended_jobs || [];
+        // Apply client-side filters
+        if (remoteOnly) {
+            skillsMatchingJobs = skillsMatchingJobs.filter(job =>
+                job.location.toLowerCase().includes('remote')
+            );
+            recommendedJobs = recommendedJobs.filter(job =>
+                job.location.toLowerCase().includes('remote')
+            );
+        }
 
-                // Apply client-side filters
-                if (remoteOnly) {
-                    skillsMatchingJobs = skillsMatchingJobs.filter(job =>
-                        job.location.toLowerCase().includes('remote')
-                    );
-                    recommendedJobs = recommendedJobs.filter(job =>
-                        job.location.toLowerCase().includes('remote')
-                    );
-                }
+        if (freshersWelcome) {
+            skillsMatchingJobs = skillsMatchingJobs.filter(job =>
+                job.experience.includes('0-') || job.experience.includes('1-')
+            );
+            recommendedJobs = recommendedJobs.filter(job =>
+                job.experience.includes('0-') || job.experience.includes('1-')
+            );
+        }
 
-                if (freshersWelcome) {
-                    skillsMatchingJobs = skillsMatchingJobs.filter(job =>
-                        job.experience.includes('0-') || job.experience.includes('1-')
-                    );
-                    recommendedJobs = recommendedJobs.filter(job =>
-                        job.experience.includes('0-') || job.experience.includes('1-')
-                    );
-                }
+        if (experienceLevel) {
+            const expFilter = experienceLevel.split('-')[0];
+            skillsMatchingJobs = skillsMatchingJobs.filter(job =>
+                job.experience.toLowerCase().includes(expFilter)
+            );
+            recommendedJobs = recommendedJobs.filter(job =>
+                job.experience.toLowerCase().includes(expFilter)
+            );
+        }
 
-                if (experienceLevel) {
-                    const expFilter = experienceLevel.split('-')[0];
-                    skillsMatchingJobs = skillsMatchingJobs.filter(job =>
-                        job.experience.toLowerCase().includes(expFilter)
-                    );
-                    recommendedJobs = recommendedJobs.filter(job =>
-                        job.experience.toLowerCase().includes(expFilter)
-                    );
-                }
-
-                console.log(`ML Analysis: ${data.total_jobs_analyzed} jobs processed`);
-                displayResults(skillsMatchingJobs, recommendedJobs, userSkills, data.total_jobs_analyzed);
-            })
-            .catch(error => {
-                console.error('API failed, using fallback data:', error);
-                // Use fallback data when API fails
-                const fallbackJobs = generateFallbackJobs(userSkills);
-                displayResults(fallbackJobs.matched, fallbackJobs.recommended, userSkills, fallbackJobs.total);
-            });
+        console.log(`Generated ${skillsMatchingJobs.length + recommendedJobs.length} job matches`);
+        displayResults(skillsMatchingJobs, recommendedJobs, userSkills, fallbackJobs.total);
     }, 4000); // Show loading overlay for 4 seconds
 }
 

@@ -124,8 +124,10 @@ function calculateRecommendationScore(userSkills, job) {
 }
 
 function searchJobs() {
+    console.log('searchJobs called');
     const skillsInput = document.getElementById('skills');
-    const userSkills = skillsInput.value.trim();
+    const userSkills = skillsInput ? skillsInput.value.trim() : '';
+    console.log('User skills:', userSkills);
 
     if (!userSkills) {
         alert('Please enter your skills');
@@ -152,9 +154,12 @@ function searchJobs() {
         try {
             console.log('Generating job matches for:', userSkills);
             const fallbackJobs = generateFallbackJobs(userSkills);
+            console.log('Generated fallback jobs:', fallbackJobs);
             
             let skillsMatchingJobs = fallbackJobs.matched || [];
             let recommendedJobs = fallbackJobs.recommended || [];
+            console.log('Skills matching jobs:', skillsMatchingJobs.length);
+            console.log('Recommended jobs:', recommendedJobs.length);
 
             // Apply client-side filters
             if (remoteOnly) {
@@ -451,8 +456,14 @@ function animateLoadingSteps() {
 
 // Add sample skills
 function addSampleSkills(skillSet) {
+    console.log('addSampleSkills called with:', skillSet);
     const skillsInput = document.getElementById('skills');
-    if (!skillsInput) return;
+    console.log('skillsInput element:', skillsInput);
+    
+    if (!skillsInput) {
+        console.error('Skills input element not found!');
+        return;
+    }
     
     const samples = {
         'ml': 'Python, Machine Learning, TensorFlow, PyTorch, scikit-learn, pandas, NumPy',
@@ -460,7 +471,11 @@ function addSampleSkills(skillSet) {
         'react': 'React, JavaScript, HTML, CSS, Redux, Node.js, TypeScript',
         'java': 'Java, Spring Boot, Hibernate, MySQL, Maven, JUnit, Microservices'
     };
-    skillsInput.value = samples[skillSet] || '';
+    
+    const skillText = samples[skillSet] || '';
+    console.log('Setting skills to:', skillText);
+    skillsInput.value = skillText;
+    console.log('Skills input value after setting:', skillsInput.value);
 }
 
 // Keyboard shortcuts

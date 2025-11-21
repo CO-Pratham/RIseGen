@@ -1,6 +1,7 @@
 from fastapi import FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
 from typing import Optional, List
 import os
 import sys
@@ -31,14 +32,23 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Mount static files
+app.mount("/static", StaticFiles(directory="web"), name="static")
+
+# Serve index.html at root
 @app.get("/")
-async def root():
-    return {
-        "message": "YuvaNova Job Matching API",
-        "status": "running",
-        "version": "3.0",
-        "source": "LinkedIn via Direct Scraping (Playwright)"
-    }
+async def read_index():
+    return FileResponse('web/index.html')
+
+# Serve other static files directly if needed (e.g. app.js, style.css)
+@app.get("/{filename}")
+async def read_static(filename: str):
+    file_path = os.path.join("web", filename)
+    if os.path.exists(file_path):
+        return FileResponse(file_path)
+    return JSONResponse(status_code=404, content={"message": "File not found"})
+
+
 
 @app.get("/health")
 async def health():

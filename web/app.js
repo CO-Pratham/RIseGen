@@ -1,6 +1,6 @@
-// API endpoint for fetching real jobs
-const API_BASE_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
-    ? 'http://localhost:8080/api' 
+// API endpoint for fetching real LinkedIn jobs
+const API_BASE_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+    ? 'http://localhost:8000/api'
     : '/api';
 
 // Local stats tracking (no backend needed)
@@ -124,7 +124,10 @@ function calculateRecommendationScore(userSkills, job) {
 }
 
 function searchJobs() {
-    console.log('searchJobs called');
+    console.log('=================================');
+    console.log('🔍 searchJobs() called');
+    console.log('=================================');
+
     const skillsInput = document.getElementById('skills');
     const userSkills = skillsInput ? skillsInput.value.trim() : '';
     console.log('User skills:', userSkills);
@@ -134,12 +137,12 @@ function searchJobs() {
         return;
     }
 
-    // Show full-page loading overlay
+    // Show full-page loading overlay IMMEDIATELY
+    console.log('📺 Showing loading screen...');
     showFullPageLoading();
+
     document.getElementById('results').classList.add('hidden');
     document.getElementById('error').classList.add('hidden');
-
-
 
     // Get filter preferences
     const remoteOnly = document.getElementById('remoteOnly')?.checked;
@@ -149,17 +152,50 @@ function searchJobs() {
     // Store experience preference for URL generation
     window.selectedExperience = experienceLevel || (freshersWelcome ? '0-1' : '');
 
-    // Use fallback data directly (no backend needed)
-    setTimeout(() => {
-        try {
-            console.log('Generating job matches for:', userSkills);
-            const fallbackJobs = generateFallbackJobs(userSkills);
-            console.log('Generated fallback jobs:', fallbackJobs);
-            
-            let skillsMatchingJobs = fallbackJobs.matched || [];
-            let recommendedJobs = fallbackJobs.recommended || [];
-            console.log('Skills matching jobs:', skillsMatchingJobs.length);
-            console.log('Recommended jobs:', recommendedJobs.length);
+    // Fetch REAL LinkedIn jobs from BrightData API
+    const location = document.getElementById('location')?.value || 'India';
+    const apiUrl = `${API_BASE_URL}/match?skills=${encodeURIComponent(userSkills)}&location=${encodeURIComponent(location)}&max_results=30`;
+
+    console.log('🌐 API Base URL:', API_BASE_URL);
+    console.log('🚀 Full API URL:', apiUrl);
+    console.log('📍 Location:', location);
+    console.log('⏰ Starting API call at:', new Date().toLocaleTimeString());
+
+    updateLoadingMessage('Triggering job scraper...');
+
+    // Set longer timeout for BrightData API (it takes 60-90 seconds)
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 120000); // 120 second timeout
+
+    fetch(apiUrl, { signal: controller.signal })
+        .then(response => {
+            clearTimeout(timeout);
+            console.log('📡 API Response received:', response.status);
+
+            if (!response.ok) {
+                throw new Error(`API returned status ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            console.log('✅ API Data:', data);
+
+            // Check if we got real LinkedIn jobs
+            let skillsMatchingJobs = data.matched_jobs || [];
+            let recommendedJobs = data.recommended_jobs || [];
+
+            console.log(`Found ${skillsMatchingJobs.length} matched jobs and ${recommendedJobs.length} recommended jobs`);
+
+            // Verify these are real LinkedIn jobs (not fallback)
+            if (skillsMatchingJobs.length > 0) {
+                const firstJob = skillsMatchingJobs[0];
+                console.log('First job sample:', {
+                    title: firstJob.title,
+                    company: firstJob.company,
+                    hasApplyLink: !!firstJob.apply_link,
+                    applyLink: firstJob.apply_link
+                });
+            }
 
             // Apply client-side filters
             if (remoteOnly) {
@@ -190,14 +226,25 @@ function searchJobs() {
                 );
             }
 
-            console.log(`Generated ${skillsMatchingJobs.length + recommendedJobs.length} job matches`);
-            displayResults(skillsMatchingJobs, recommendedJobs, userSkills, fallbackJobs.total);
-        } catch (error) {
-            console.error('Error generating jobs:', error);
+            console.log(`✅ Displaying ${skillsMatchingJobs.length + recommendedJobs.length} REAL LinkedIn jobs`);
             hideFullPageLoading();
-            showError();
-        }
-    }, 4000); // Show loading overlay for 4 seconds
+            displayResults(skillsMatchingJobs, recommendedJobs, userSkills, data.total_jobs_found || 0);
+        })
+        .catch(error => {
+            console.error('❌ Error fetching jobs from API:', error);
+            console.error('Error details:', error.message);
+
+            // Check if it was a timeout
+            if (error.name === 'AbortError') {
+                console.error('⏱️ Request timed out after 120 seconds');
+                updateLoadingMessage('Request timed out. Using cached results...');
+            }
+
+            hideFullPageLoading();
+
+            // Show error or empty state
+            displayResults([], [], userSkills, 0);
+        });
 }
 
 function displayResults(skillsMatchingJobs, recommendedJobs, userSkills, totalAnalyzed = 0) {
@@ -255,101 +302,81 @@ function displayResults(skillsMatchingJobs, recommendedJobs, userSkills, totalAn
     document.getElementById('results').classList.remove('hidden');
 }
 
-function generateSearchUrl(job, platform) {
-    const jobTitle = encodeURIComponent(job.title.toLowerCase().replace(/\s+/g, '+'));
-    const location = encodeURIComponent(job.location.split(',')[0].toLowerCase());
-    const experience = window.selectedExperience || '';
-
-    // Build query with skills and experience
-    let query = job.title;
-    if (experience) {
-        query += ` ${experience} years experience`;
-    }
-
-    if (platform === 'naukri' || job.source === 'naukri') {
-        // Naukri URL with experience filter
-        const baseUrl = `https://www.naukri.com/${job.title.toLowerCase().replace(/\s+/g, '-')}-jobs`;
-        let params = [];
-
-        if (location) {
-            params.push(`in-${location.replace(/\s+/g, '-')}`);
-        }
-
-        // Add experience to URL
-        if (experience) {
-            const expParam = experience.replace('+', '-plus');
-            return `${baseUrl}-${params.join('-')}?experience=${expParam}`;
-        }
-
-        return params.length > 0 ? `${baseUrl}-${params.join('-')}` : baseUrl;
-    } else {
-        // Indeed URL with experience filter
-        let indeedUrl = `https://www.indeed.co.in/jobs?q=${encodeURIComponent(query)}&l=${location}`;
-
-        // Add experience level to Indeed search
-        if (experience) {
-            indeedUrl += `&explvl=`;
-            if (experience === '0-1') {
-                indeedUrl += 'entry_level';
-            } else if (experience === '1-3') {
-                indeedUrl += 'mid_level';
-            } else if (experience === '3-5' || experience === '5+') {
-                indeedUrl += 'senior_level';
-            }
-        }
-
-        return indeedUrl;
-    }
+function generateLinkedInSearchUrl(jobTitle, location) {
+    // Generate LinkedIn job search URL as fallback
+    const title = encodeURIComponent(jobTitle);
+    const loc = encodeURIComponent(location.split(',')[0]);
+    return `https://www.linkedin.com/jobs/search/?keywords=${title}&location=${loc}`;
 }
 
 function createJobCard(job, type) {
     const score = job.match_percentage ? job.match_percentage / 100 : (type === 'match' ? job.matchScore : job.recommendationScore);
     const percentage = job.match_percentage || Math.round(score * 100);
-    const algorithm = type === 'match' ? 'ML Match' : 'ML Recommendation';
+    const algorithm = type === 'match' ? 'LinkedIn Match' : 'LinkedIn Recommendation';
     const scoreLabel = algorithm;
 
-    const skillTags = job.skills.map(skill => `<span class="skill-tag">${skill}</span>`).join('');
+    // Handle skills array properly
+    const skills = Array.isArray(job.skills) ? job.skills : (job.qualifications || []);
+    const skillTags = skills.length > 0
+        ? skills.slice(0, 6).map(skill => `<span class="skill-tag">${skill}</span>`).join('')
+        : '<span class="skill-tag">View job for details</span>';
 
-    // Add confidence indicator based on score
-    let confidenceColor = '#e8f5e8';
-    let confidenceText = 'Good Match';
-    if (percentage >= 80) {
-        confidenceColor = '#d4edda';
-        confidenceText = 'Excellent Match';
-    } else if (percentage >= 60) {
-        confidenceColor = '#fff3cd';
-        confidenceText = 'Good Match';
+    // Use actual apply link from LinkedIn API or generate search URL
+    let applyLink;
+    if (job.apply_link && job.apply_link !== '#') {
+        // Use the actual LinkedIn job URL from API
+        applyLink = job.apply_link;
+    } else if (job.url && job.url !== '#') {
+        applyLink = job.url;
     } else {
-        confidenceColor = '#f8d7da';
-        confidenceText = 'Fair Match';
+        // Generate LinkedIn search URL as fallback
+        applyLink = generateLinkedInSearchUrl(job.title, job.location);
     }
+
+    const companyLogo = job.thumbnail || job.company_logo || '';
+    const applicants = job.applicants || 'N/A';
+    const experienceLevel = job.experience_level || job.experience || 'N/A';
+    const postedDate = job.posted_date || job.posted_at || 'Recently';
 
     return `
         <div class="job-card">
-            <div class="job-title">${job.title}</div>
-            <div class="job-company">${job.company}</div>
+            <div class="job-header">
+                ${companyLogo ? `<img src="${companyLogo}" alt="${job.company}" class="company-logo" onerror="this.style.display='none'">` : ''}
+                <div>
+                    <div class="job-title">${job.title}</div>
+                    <div class="job-company">${job.company}</div>
+                </div>
+            </div>
             <div class="job-location">📍 ${job.location}</div>
+            <div class="job-meta-info">
+                <span>🕐 ${postedDate}</span>
+                <span>👥 ${applicants} applicants</span>
+                <span>📊 ${experienceLevel}</span>
+            </div>
             <div class="job-skills">
-                <strong>Required Skills</strong>
+                <strong>Required Skills:</strong>
                 ${skillTags}
             </div>
             <div class="job-meta">
                 <span class="job-match">${percentage}% ${scoreLabel}</span>
-                <span class="job-source">${job.source}</span>
+                <span class="job-source">
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="#0077B5">
+                        <path d="M14.5 0h-13C.675 0 0 .675 0 1.5v13c0 .825.675 1.5 1.5 1.5h13c.825 0 1.5-.675 1.5-1.5v-13c0-.825-.675-1.5-1.5-1.5zM4.75 13H2.5V6h2.25v7zM3.625 5.048a1.305 1.305 0 110-2.609 1.305 1.305 0 010 2.61zM13.5 13h-2.25V9.75c0-.825-.675-1.5-1.5-1.5s-1.5.675-1.5 1.5V13H6V6h2.25v.975c.45-.6 1.2-.975 2.25-.975 1.65 0 3 1.35 3 3V13z"/>
+                    </svg>
+                    ${job.source || 'LinkedIn'}
+                </span>
             </div>
             <div class="job-details">
-                <span>💰 ${job.salary}</span>
-                <span>📊 ${job.experience}</span>
+                <span>💰 ${job.salary || 'Not disclosed'}</span>
+                <span>🏢 ${job.schedule_type || 'Full-time'}</span>
+                ${job.is_remote ? '<span>🏠 Remote</span>' : ''}
             </div>
             <div class="job-actions">
-                <a href="${generateSearchUrl(job, 'naukri')}" target="_blank" class="job-link">
-                    View on Naukri
-                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                        <path d="M3 8H13M13 8L8 3M13 8L8 13" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                <a href="${applyLink}" target="_blank" rel="noopener noreferrer" class="job-link linkedin-link">
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                        <path d="M14.5 0h-13C.675 0 0 .675 0 1.5v13c0 .825.675 1.5 1.5 1.5h13c.825 0 1.5-.675 1.5-1.5v-13c0-.825-.675-1.5-1.5-1.5z"/>
                     </svg>
-                </a>
-                <a href="${job.url}" target="_blank" class="job-link" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%);">
-                    View Job Details
+                    Apply on LinkedIn
                     <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                         <path d="M3 8H13M13 8L8 3M13 8L8 13" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                     </svg>
@@ -364,8 +391,15 @@ function showError() {
     document.getElementById('error').classList.remove('hidden');
 }
 
+function updateLoadingMessage(message) {
+    const loadingMsg = document.getElementById('loadingMessage');
+    if (loadingMsg) {
+        loadingMsg.textContent = message;
+    }
+}
+
 function showFullPageLoading() {
-    // Create full-page loading overlay
+    // Create full-page loading overlay with realistic timing
     const overlay = document.createElement('div');
     overlay.id = 'fullPageLoading';
     overlay.innerHTML = `
@@ -376,26 +410,38 @@ function showFullPageLoading() {
                     <div class="loader-circle"></div>
                     <div class="loader-circle"></div>
                 </div>
-                <h2>Analyzing Your Skills</h2>
-                <p>AI is processing thousands of Naukri jobs to find perfect matches...</p>
+                <h2>Fetching Real Jobs</h2>
+                <p id="loadingMessage">Connecting to job sources...</p>
+                <div class="loading-info">
+                    <p style="font-size: 14px; color: #6b7280; margin-top: 12px;">
+                        ⏱️ This may take a moment to scrape live job data
+                    </p>
+                    <p style="font-size: 14px; color: #10b981; margin-top: 8px;">
+                        🔄 Please wait - fetching real job postings with working links
+                    </p>
+                </div>
                 <div class="progress-steps">
                     <div class="step active" id="loadStep1">
                         <span class="step-number">1</span>
-                        <span class="step-text">Extracting Skills</span>
+                        <span class="step-text">API Request</span>
                     </div>
                     <div class="step" id="loadStep2">
                         <span class="step-number">2</span>
-                        <span class="step-text">Scraping Naukri Jobs</span>
+                        <span class="step-text">Scraping Jobs</span>
                     </div>
                     <div class="step" id="loadStep3">
                         <span class="step-number">3</span>
-                        <span class="step-text">ML Analysis</span>
+                        <span class="step-text">Parsing Data</span>
                     </div>
                     <div class="step" id="loadStep4">
                         <span class="step-number">4</span>
-                        <span class="step-text">Ranking Results</span>
+                        <span class="step-text">Preparing Results</span>
                     </div>
                 </div>
+                <div class="progress-bar-container" style="width: 100%; max-width: 400px; height: 8px; background: rgba(255,255,255,0.2); border-radius: 4px; margin-top: 20px; overflow: hidden;">
+                    <div id="progressBar" style="height: 100%; background: linear-gradient(90deg, #4f46e5, #10b981); width: 0%; transition: width 1s linear;"></div>
+                </div>
+                <p id="progressText" style="font-size: 13px; color: #9ca3af; margin-top: 8px;">0% complete</p>
             </div>
         </div>
     `;
@@ -403,8 +449,9 @@ function showFullPageLoading() {
     document.body.appendChild(overlay);
     document.body.style.overflow = 'hidden';
 
-    // Animate through steps
+    // Animate through steps with realistic timing
     animateLoadingSteps();
+    animateProgressBar();
 }
 
 function hideFullPageLoading() {
@@ -414,15 +461,26 @@ function hideFullPageLoading() {
     }
     document.body.style.overflow = 'auto';
 
-    // Clear loading interval
+    // Clear all intervals
     if (window.loadingInterval) {
         clearInterval(window.loadingInterval);
         window.loadingInterval = null;
+    }
+
+    if (window.progressInterval) {
+        clearInterval(window.progressInterval);
+        window.progressInterval = null;
     }
 }
 
 function animateLoadingSteps() {
     const steps = ['loadStep1', 'loadStep2', 'loadStep3', 'loadStep4'];
+    const messages = [
+        'Sending request to job sources...',
+        'Scraping for real job postings...',
+        'Extracting job details and links...',
+        'Preparing results for display...'
+    ];
     let currentStep = 0;
 
     const interval = setInterval(() => {
@@ -435,23 +493,58 @@ function animateLoadingSteps() {
         // Add active to current step
         if (currentStep < steps.length) {
             const elem = document.getElementById(steps[currentStep]);
-            if (elem) elem.classList.add('active');
+            if (elem) {
+                elem.classList.add('active');
+                updateLoadingMessage(messages[currentStep]);
+            }
             currentStep++;
-        } else {
-            currentStep = 0; // Loop back
         }
-    }, 1000);
+    }, 20000); // Change step every 20 seconds (realistic for BrightData)
 
     // Store interval to clear it later
     window.loadingInterval = interval;
 
-    // Auto-clear after 10 seconds to prevent memory leaks
+    // Auto-clear after 120 seconds
     setTimeout(() => {
         if (window.loadingInterval) {
             clearInterval(window.loadingInterval);
             window.loadingInterval = null;
         }
-    }, 10000);
+    }, 120000);
+}
+
+function animateProgressBar() {
+    const progressBar = document.getElementById('progressBar');
+    const progressText = document.getElementById('progressText');
+
+    if (!progressBar || !progressText) return;
+
+    let progress = 0;
+    const duration = 90000; // 90 seconds total
+    const interval = 1000; // Update every second
+    const increment = (interval / duration) * 100;
+
+    const progressInterval = setInterval(() => {
+        progress += increment;
+
+        if (progress >= 100) {
+            progress = 100;
+            clearInterval(progressInterval);
+        }
+
+        progressBar.style.width = progress + '%';
+        progressText.textContent = Math.floor(progress) + '% complete';
+    }, interval);
+
+    window.progressInterval = progressInterval;
+
+    // Auto-clear
+    setTimeout(() => {
+        if (window.progressInterval) {
+            clearInterval(window.progressInterval);
+            window.progressInterval = null;
+        }
+    }, duration + 5000);
 }
 
 // Add sample skills
@@ -459,19 +552,19 @@ function addSampleSkills(skillSet) {
     console.log('addSampleSkills called with:', skillSet);
     const skillsInput = document.getElementById('skills');
     console.log('skillsInput element:', skillsInput);
-    
+
     if (!skillsInput) {
         console.error('Skills input element not found!');
         return;
     }
-    
+
     const samples = {
         'ml': 'Python, Machine Learning, TensorFlow, PyTorch, scikit-learn, pandas, NumPy',
         'software': 'JavaScript, Python, Java, SQL, Git, REST API, Agile',
         'react': 'React, JavaScript, HTML, CSS, Redux, Node.js, TypeScript',
         'java': 'Java, Spring Boot, Hibernate, MySQL, Maven, JUnit, Microservices'
     };
-    
+
     const skillText = samples[skillSet] || '';
     console.log('Setting skills to:', skillText);
     skillsInput.value = skillText;
@@ -533,9 +626,9 @@ function clearSkills() {
 function updateSkillTags() {
     const skillsInput = document.getElementById('skills');
     const skillTags = document.getElementById('skillTags');
-    
+
     if (!skillTags || !skillsInput) return; // Exit if elements don't exist
-    
+
     const skills = skillsInput.value.split(',').map(s => s.trim()).filter(s => s.length > 0);
 
     skillTags.innerHTML = skills.map(skill => `
@@ -550,10 +643,10 @@ function updateSkillTags() {
 function removeSkill(skillToRemove) {
     const skillsInput = document.getElementById('skills');
     if (!skillsInput) return;
-    
+
     const skills = skillsInput.value.split(',').map(s => s.trim()).filter(s => s !== skillToRemove);
     skillsInput.value = skills.join(', ');
-    
+
     const skillTags = document.getElementById('skillTags');
     if (skillTags) {
         updateSkillTags();
@@ -575,46 +668,51 @@ function updateSearchPreferences() {
 function generateFallbackJobs(userSkills) {
     try {
         const skillsArray = userSkills.toLowerCase().split(/[,\s]+/).filter(s => s.length > 2);
-    
-    const jobTemplates = [
-        { title: 'Software Developer', company: 'Tech Solutions Inc', location: 'Bangalore, India', salary: '₹8-12 LPA', experience: '2-4 years', source: 'naukri' },
-        { title: 'Full Stack Developer', company: 'Digital Innovations', location: 'Mumbai, India', salary: '₹10-15 LPA', experience: '3-5 years', source: 'naukri' },
-        { title: 'Frontend Developer', company: 'WebTech Corp', location: 'Pune, India', salary: '₹6-10 LPA', experience: '1-3 years', source: 'naukri' },
-        { title: 'Backend Developer', company: 'DataFlow Systems', location: 'Hyderabad, India', salary: '₹9-14 LPA', experience: '2-5 years', source: 'naukri' },
-        { title: 'Python Developer', company: 'AI Innovations', location: 'Chennai, India', salary: '₹7-11 LPA', experience: '1-4 years', source: 'naukri' },
-        { title: 'React Developer', company: 'Modern Web Solutions', location: 'Gurgaon, India', salary: '₹8-13 LPA', experience: '2-4 years', source: 'naukri' },
-        { title: 'DevOps Engineer', company: 'Cloud Systems Ltd', location: 'Bangalore, India', salary: '₹12-18 LPA', experience: '3-6 years', source: 'naukri' },
-        { title: 'Data Scientist', company: 'Analytics Pro', location: 'Mumbai, India', salary: '₹15-25 LPA', experience: '2-5 years', source: 'naukri' }
-    ];
-    
-    const matched = [];
-    const recommended = [];
-    
-    jobTemplates.forEach(template => {
-        const jobSkills = generateSkillsForJob(template.title, skillsArray);
-        const matchScore = calculateMatchScore(userSkills, jobSkills);
-        const recommendationScore = calculateRecommendationScore(userSkills, { ...template, skills: jobSkills });
-        
-        const job = {
-            ...template,
-            skills: jobSkills,
-            url: `https://www.naukri.com/job-listings-${template.title.toLowerCase().replace(/\s+/g, '-')}-${template.company.toLowerCase().replace(/\s+/g, '-')}-${Math.random().toString(36).substr(2, 9)}`,
-            matchScore,
-            recommendationScore
-        };
-        
-        // Only include jobs with meaningful match scores
-        if (matchScore > 0.3) {
-            matched.push(job);
-        } else if (recommendationScore > 0.2) {
-            recommended.push(job);
-        }
-    });
-    
-    // Sort by match scores
-    matched.sort((a, b) => b.matchScore - a.matchScore);
-    recommended.sort((a, b) => b.recommendationScore - a.recommendationScore);
-    
+
+        const jobTemplates = [
+            { title: 'Software Developer', company: 'Tech Solutions Inc', location: 'Bangalore, India', salary: '₹8-12 LPA', experience: '2-4 years', source: 'LinkedIn' },
+            { title: 'Full Stack Developer', company: 'Digital Innovations', location: 'Mumbai, India', salary: '₹10-15 LPA', experience: '3-5 years', source: 'LinkedIn' },
+            { title: 'Frontend Developer', company: 'WebTech Corp', location: 'Pune, India', salary: '₹6-10 LPA', experience: '1-3 years', source: 'LinkedIn' },
+            { title: 'Backend Developer', company: 'DataFlow Systems', location: 'Hyderabad, India', salary: '₹9-14 LPA', experience: '2-5 years', source: 'LinkedIn' },
+            { title: 'Python Developer', company: 'AI Innovations', location: 'Chennai, India', salary: '₹7-11 LPA', experience: '1-4 years', source: 'LinkedIn' },
+            { title: 'React Developer', company: 'Modern Web Solutions', location: 'Gurgaon, India', salary: '₹8-13 LPA', experience: '2-4 years', source: 'LinkedIn' },
+            { title: 'DevOps Engineer', company: 'Cloud Systems Ltd', location: 'Bangalore, India', salary: '₹12-18 LPA', experience: '3-6 years', source: 'LinkedIn' },
+            { title: 'Data Scientist', company: 'Analytics Pro', location: 'Mumbai, India', salary: '₹15-25 LPA', experience: '2-5 years', source: 'LinkedIn' }
+        ];
+
+        const matched = [];
+        const recommended = [];
+
+        jobTemplates.forEach(template => {
+            const jobSkills = generateSkillsForJob(template.title, skillsArray);
+            const matchScore = calculateMatchScore(userSkills, jobSkills);
+            const recommendationScore = calculateRecommendationScore(userSkills, { ...template, skills: jobSkills });
+
+            // Generate LinkedIn URL for fallback jobs
+            const linkedinUrl = `https://www.linkedin.com/jobs/search/?keywords=${encodeURIComponent(template.title)}&location=${encodeURIComponent(template.location.split(',')[0])}`;
+
+            const job = {
+                ...template,
+                skills: jobSkills,
+                url: linkedinUrl,
+                apply_link: linkedinUrl,
+                source: 'LinkedIn',
+                matchScore,
+                recommendationScore
+            };
+
+            // Only include jobs with meaningful match scores
+            if (matchScore > 0.3) {
+                matched.push(job);
+            } else if (recommendationScore > 0.2) {
+                recommended.push(job);
+            }
+        });
+
+        // Sort by match scores
+        matched.sort((a, b) => b.matchScore - a.matchScore);
+        recommended.sort((a, b) => b.recommendationScore - a.recommendationScore);
+
         return { matched: matched.slice(0, 4), recommended: recommended.slice(0, 4), total: jobTemplates.length };
     } catch (error) {
         console.error('Error in generateFallbackJobs:', error);
@@ -633,24 +731,24 @@ function generateSkillsForJob(jobTitle, userSkills) {
         'DevOps Engineer': ['AWS', 'Docker', 'Kubernetes', 'Jenkins', 'Linux'],
         'Data Scientist': ['Python', 'Machine Learning', 'TensorFlow', 'pandas', 'scikit-learn']
     };
-    
+
     let jobSkills = [...(skillMap[jobTitle] || ['JavaScript', 'Python', 'SQL'])];
-    
+
     // Match user skills with job requirements
-    const matchingSkills = userSkills.filter(userSkill => 
-        jobSkills.some(jobSkill => 
-            jobSkill.toLowerCase().includes(userSkill) || 
+    const matchingSkills = userSkills.filter(userSkill =>
+        jobSkills.some(jobSkill =>
+            jobSkill.toLowerCase().includes(userSkill) ||
             userSkill.includes(jobSkill.toLowerCase())
         )
     );
-    
+
     // Replace some job skills with matching user skills for better relevance
     matchingSkills.forEach((skill, index) => {
         if (index < jobSkills.length) {
             jobSkills[index] = skill.charAt(0).toUpperCase() + skill.slice(1);
         }
     });
-    
+
     return jobSkills.slice(0, 6);
 }
 
@@ -658,7 +756,7 @@ function generateSkillsForJob(jobTitle, userSkills) {
 function toggleMobileMenu() {
     const sidebar = document.getElementById('mobileSidebar');
     const overlay = document.getElementById('sidebarOverlay');
-    
+
     sidebar.classList.toggle('open');
     overlay.classList.toggle('open');
 }

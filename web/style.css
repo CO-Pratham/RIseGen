@@ -1249,3 +1249,54 @@ body {
         font-size: 36px;
     }
 }
+/* LinkedIn Job Card Styles */
+.job-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+    margin-bottom: 16px;
+}
+
+.company-logo {
+    width: 48px;
+    height: 48px;
+    border-radius: 8px;
+    object-fit: contain;
+    background: var(--bg-tertiary);
+    padding: 4px;
+    flex-shrink: 0;
+}
+
+.job-meta-info {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin: 12px 0;
+    font-size: 13px;
+    color: var(--text-secondary);
+}
+
+.job-meta-info span {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.linkedin-link {
+    background: linear-gradient(135deg, #0077B5 0%, #005582 100%) !important;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    justify-content: center;
+}
+
+.linkedin-link:hover {
+    background: linear-gradient(135deg, #005582 0%, #004466 100%) !important;
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(0, 119, 181, 0.3);
+}
+
+.job-source svg {
+    vertical-align: middle;
+    margin-right: 4px;
+}

@@ -12,7 +12,7 @@ def run_api_server():
         "python3", "-m", "uvicorn", 
         "src.api.main:app", 
         "--host", "0.0.0.0", 
-        "--port", "8080", 
+        "--port", "8000", 
         "--reload"
     ])
 
